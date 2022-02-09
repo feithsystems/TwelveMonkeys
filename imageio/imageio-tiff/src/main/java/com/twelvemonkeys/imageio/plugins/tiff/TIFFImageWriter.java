@@ -35,7 +35,6 @@ import com.twelvemonkeys.imageio.ImageWriterBase;
 import com.twelvemonkeys.imageio.color.ColorProfiles;
 import com.twelvemonkeys.imageio.metadata.Directory;
 import com.twelvemonkeys.imageio.metadata.Entry;
-import com.twelvemonkeys.imageio.metadata.tiff.Rational;
 import com.twelvemonkeys.imageio.metadata.tiff.TIFF;
 import com.twelvemonkeys.imageio.metadata.tiff.TIFFEntry;
 import com.twelvemonkeys.imageio.metadata.tiff.TIFFWriter;
@@ -103,8 +102,6 @@ public final class TIFFImageWriter extends ImageWriterBase {
     // CCITT compressions T.4 and T.6
     // Support storing multiple images in one stream (multi-page TIFF)
     // Support more of the ImageIO metadata (ie. compression from metadata, etc)
-
-    private static final Rational STANDARD_DPI = new Rational(72);
 
     /**
      * Flag for active sequence writing
@@ -809,10 +806,22 @@ public final class TIFFImageWriter extends ImageWriterBase {
             case TIFFExtension.COMPRESSION_ZLIB:
             case TIFFExtension.COMPRESSION_DEFLATE:
             case TIFFExtension.COMPRESSION_LZW:
-                // TODO: Let param/metadata control predictor
-                // TODO: Depending on param.getCompressionMode(): DISABLED/EXPLICIT/COPY_FROM_METADATA/DEFAULT
-                if (pixelSize >= 8) {
-                    entries.put(TIFF.TAG_PREDICTOR, new TIFFEntry(TIFF.TAG_PREDICTOR, TIFFExtension.PREDICTOR_HORIZONTAL_DIFFERENCING));
+                
+                //
+                // DISABLED removes any predictor set via metadata as the image will not be compressed
+                //
+                // DEFAULT or the absence of a predictor via metadata results in horizontal differencing
+                //
+                // EXPLICIT and COPY_FROM_METADATA will retain any predictor value present in metadata
+                //
+                if( pixelSize >= 8 ) {
+                    
+                    if( param == null || param.getCompressionMode() == TIFFImageWriteParam.MODE_DEFAULT || !entries.containsKey( TIFF.TAG_PREDICTOR ) ) {
+                        entries.put(TIFF.TAG_PREDICTOR, new TIFFEntry(TIFF.TAG_PREDICTOR, TIFFExtension.PREDICTOR_HORIZONTAL_DIFFERENCING));
+                    }
+                    else if( param.getCompressionMode() == TIFFImageWriteParam.MODE_DISABLED ) {
+                    	entries.remove( TIFF.TAG_PREDICTOR );
+                    }
                 }
 
                 break;
@@ -900,6 +909,7 @@ public final class TIFFImageWriter extends ImageWriterBase {
                 case TIFF.TAG_Y_POSITION:
                 case TIFF.TAG_PAGE_NUMBER:
                 case TIFF.TAG_XMP:
+                case TIFF.TAG_PREDICTOR:
                 // Private/Custom
                 case TIFF.TAG_IPTC:
                 case TIFF.TAG_PHOTOSHOP:
